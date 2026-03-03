@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATPB – Treasure Coast Site Tour</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --steel: #1a2332;
+    --steel-mid: #243044;
+    --steel-light: #2e3d54;
+    --amber: #f5a623;
+    --amber-dim: #c47d0e;
+    --cyan: #38bdf8;
+    --green: #4ade80;
+    --red: #f87171;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --border: rgba(255,255,255,0.08);
+    --day1: #f5a623;
+    --day2: #38bdf8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: var(--steel);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--steel-mid);
+    border-bottom: 2px solid var(--amber);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+    z-index: 1000;
+  }
+  .logo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 22px;
+    letter-spacing: 2px;
+    color: var(--amber);
+    text-transform: uppercase;
+  }
+  .header-divider { width: 2px; height: 28px; background: var(--border); }
+  .header-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .header-stats {
+    margin-left: auto;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+  }
+  .stat { text-align: center; }
+  .stat-num {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--amber);
+    line-height: 1;
+  }
+  .stat-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .day-toggle {
+    display: flex;
+    gap: 6px;
+  }
+  .day-btn {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 4px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    opacity: 0.5;
+  }
+  .day-btn.active { opacity: 1; }
+  .day-btn.d1 { background: var(--day1); color: #1a1a1a; }
+  .day-btn.d2 { background: var(--day2); color: #1a1a1a; }
+  .day-btn.all { background: var(--steel-light); color: var(--text); border: 1px solid var(--border); }
+  .day-btn.all.active { opacity: 1; background: var(--text); color: var(--steel); }
+
+  /* MAIN LAYOUT */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 360px;
+    flex-shrink: 0;
+    background: var(--steel-mid);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-search {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .search-input {
+    width: 100%;
+    background: var(--steel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px;
+    outline: none;
+  }
+  .search-input::placeholder { color: var(--text-muted); }
+  .search-input:focus { border-color: var(--amber); }
+
+  .stop-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+  .stop-list::-webkit-scrollbar { width: 4px; }
+  .stop-list::-webkit-scrollbar-track { background: transparent; }
+  .stop-list::-webkit-scrollbar-thumb { background: var(--steel-light); border-radius: 2px; }
+
+  .day-header {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 8px 6px 4px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .day-header .day-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .day-header .day-line {
+    flex: 1; height: 1px; background: var(--border);
+  }
+
+  .stop-card {
+    background: var(--steel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 5px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-left: 3px solid transparent;
+    position: relative;
+  }
+  .stop-card:hover { background: var(--steel-light); border-color: rgba(255,255,255,0.15); }
+  .stop-card.active { background: var(--steel-light); }
+  .stop-card.day1 { border-left-color: var(--day1); }
+  .stop-card.day2 { border-left-color: var(--day2); }
+  .stop-num {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .stop-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+    margin-bottom: 4px;
+  }
+  .stop-address {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.3;
+  }
+  .stop-tags {
+    display: flex;
+    gap: 4px;
+    margin-top: 5px;
+    flex-wrap: wrap;
+  }
+  .tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .tag-contractor { background: rgba(245,166,35,0.15); color: var(--amber); }
+  .tag-time { background: rgba(56,189,248,0.15); color: var(--cyan); }
+  .tag-multi { background: rgba(74,222,128,0.12); color: var(--green); }
+
+  /* MAP */
+  #map {
+    flex: 1;
+    z-index: 1;
+  }
+
+  /* POPUP / DETAIL PANEL */
+  .detail-panel {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    width: 340px;
+    background: var(--steel-mid);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    z-index: 500;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    display: none;
+    overflow: hidden;
+  }
+  .detail-panel.visible { display: block; }
+  .detail-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .detail-stop-badge {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    margin-bottom: 4px;
+    display: inline-block;
+  }
+  .detail-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--text);
+    margin-top: 4px;
+  }
+  .close-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0 0 0 8px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .close-btn:hover { color: var(--text); }
+  .detail-body { padding: 12px 16px 16px; }
+  .detail-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    align-items: flex-start;
+  }
+  .detail-label {
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 10px;
+    width: 80px;
+    flex-shrink: 0;
+    padding-top: 1px;
+  }
+  .detail-value {
+    color: var(--text);
+    flex: 1;
+    line-height: 1.4;
+  }
+  .detail-value.highlight { color: var(--amber); font-weight: 500; }
+  .multi-badge {
+    display: inline-block;
+    background: rgba(74,222,128,0.15);
+    color: var(--green);
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    margin-top: 6px;
+  }
+  .project-list { margin-top: 6px; }
+  .project-item {
+    background: var(--steel);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 5px;
+    border-left: 2px solid var(--amber);
+    font-size: 11px;
+  }
+  .project-item-name {
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+    font-size: 12px;
+  }
+  .project-item-detail { color: var(--text-muted); }
+
+  /* Leaflet custom markers */
+  .custom-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    border: 2px solid rgba(0,0,0,0.3);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .custom-marker span { transform: rotate(45deg); }
+
+  .leaflet-popup-content-wrapper {
+    background: var(--steel-mid) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+  }
+  .leaflet-popup-tip { background: var(--steel-mid) !important; }
+  .leaflet-popup-content { margin: 10px 14px !important; font-family: 'Barlow', sans-serif !important; }
+
+  @media (max-width: 700px) {
+    .sidebar { display: none; }
+    .detail-panel { width: calc(100vw - 32px); left: 16px; right: 16px; }
+    .header-stats { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">ATPB</div>
+  <div class="header-divider"></div>
+  <div class="header-title">Treasure Coast Site Tour</div>
+  <div class="header-stats">
+    <div class="stat"><div class="stat-num">34</div><div class="stat-label">Sites</div></div>
+    <div class="stat"><div class="stat-num">~187</div><div class="stat-label">Miles</div></div>
+    <div class="stat"><div class="stat-num">2</div><div class="stat-label">Days</div></div>
+  </div>
+  <div class="day-toggle" style="margin-left:16px;">
+    <button class="day-btn all active" onclick="filterDay('all')">All</button>
+    <button class="day-btn d1" onclick="filterDay(1)">Day 1</button>
+    <button class="day-btn d2" onclick="filterDay(2)">Day 2</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-search">
+      <input class="search-input" type="text" placeholder="Search projects, contractors..." oninput="filterSearch(this.value)" />
+    </div>
+    <div class="stop-list" id="stopList"></div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<div class="detail-panel" id="detailPanel">
+  <div class="detail-header">
+    <div>
+      <div class="detail-stop-badge" id="dpBadge"></div>
+      <div class="detail-name" id="dpName"></div>
+    </div>
+    <button class="close-btn" onclick="closeDetail()">✕</button>
+  </div>
+  <div class="detail-body" id="dpBody"></div>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+// Each stop groups one or more spreadsheet projects at the same/nearby location
+const stops = [
+  // DAY 1
+  {
+    id: 1, day: 1, stop: 1,
+    name: "Sebastian Inlet / North Hutchinson Island",
+    lat: 27.857, lng: -80.453,
+    arrivalTime: "8:00 AM",
+    projects: [
+      { title: "Sebastian Inlet", contractor: "Skanska", address: "North Hutchinson Island, Vero Beach, FL 32963", bidDate: "Sep 22, 2025", id: 1911 }
+    ]
+  },
+  {
+    id: 2, day: 1, stop: 2,
+    name: "Schumann Drive Apartments",
+    lat: 27.816, lng: -80.472,
+    arrivalTime: "8:20 AM",
+    projects: [
+      { title: "Schumann Drive Apartments", contractor: "Blue Water Engineering & Development", address: "Empress Ave & Schumann Dr, Sebastian, FL 32958", bidDate: "Oct 3, 2025", id: 1743 }
+    ]
+  },
+  {
+    id: 3, day: 1, stop: 3,
+    name: "Vero Beach Cluster",
+    lat: 27.654, lng: -80.393,
+    arrivalTime: "9:00 AM",
+    projects: [
+      { title: "Vero Beach Multifamily", contractor: "Harcon", address: "27.659, -80.390", bidDate: "Aug 14, 2025", id: 1869 },
+      { title: "IRC Sector 5 Dune Restoration", contractor: "Dickerson Florida, Inc", address: "27°39'44.4\"N 80°21'29.5\"W", bidDate: "Sep 29, 2025", id: 1767 },
+      { title: "Sunbelt", contractor: "South Florida Grading, Inc", address: "9875 20th St, Vero Beach, FL 32966", bidDate: "Oct 9, 2025", id: 1701 },
+      { title: "Emerson Oaks", contractor: "H & J Contracting", address: "4575 13th Street SW, Vero Beach, FL 32968", bidDate: "Aug 8, 2025", id: 1746 },
+      { title: "E4W98 Project", contractor: "Alexander Design + Build LLC", address: "4646 U.S. Rte 1, Vero Beach, FL 32967", bidDate: "Sep 10, 2025", id: 1719 }
+    ]
+  },
+  {
+    id: 4, day: 1, stop: 4,
+    name: "Fort Pierce North Cluster",
+    lat: 27.452, lng: -80.346,
+    arrivalTime: "10:15 AM",
+    projects: [
+      { title: "Buc-ee's Travel Center #73", contractor: "Blue Water Engineering & Development", address: "11825 Indrio Rd, Fort Pierce, FL 34951", bidDate: "Sep 25, 2025", id: 1641 },
+      { title: "Buc-ee's Travel Center (I-95 & Indrio)", contractor: "Dykstra Construction, LLC", address: "SEC of I-95 and Indrio Road", bidDate: "Nov 10, 2025", id: 1872 },
+      { title: "Taylor Dairy Job #23172", contractor: "WHARTON-SMITH, INC.", address: "4554 Taylor Dairy Rd, Fort Pierce, FL 34946", bidDate: "Sep 11, 2025", id: 1875 },
+      { title: "Indian River Drive Corridor", contractor: "Ferreira Construction – Southern", address: "500 N Indian River Dr, Fort Pierce, FL 34950", bidDate: "Oct 3, 2025", id: 1629 }
+    ]
+  },
+  {
+    id: 5, day: 1, stop: 5,
+    name: "Almeria / SLC Harmony Heights – Fort Pierce",
+    lat: 27.45, lng: -80.349,
+    arrivalTime: "10:30 AM",
+    projects: [
+      { title: "Almeria", contractor: "South Florida Grading Land Development Corp", address: "357 Smallwood Ave, Fort Pierce, FL 34982", bidDate: "Aug 28, 2025", id: 1821 },
+      { title: "SLC Harmony Heights", contractor: "Environmental Land Development, Inc", address: "Juanita Ave & N 42nd St, Fort Pierce, FL 34946", bidDate: "Aug 11, 2025", id: 1881 }
+    ]
+  },
+  {
+    id: 6, day: 1, stop: 6,
+    name: "Regetta – Fort Pierce",
+    lat: 27.42, lng: -80.367,
+    arrivalTime: "10:50 AM",
+    projects: [
+      { title: "Regetta", contractor: "South Florida Grading Land Development Corp", address: "2152 S Jenkins Rd, Fort Pierce, FL 34947", bidDate: "Aug 13, 2025", id: 1593 }
+    ]
+  },
+  {
+    id: 7, day: 1, stop: 7,
+    name: "The Atlantic on Hutchinson Island",
+    lat: 27.435, lng: -80.281,
+    arrivalTime: "11:20 AM",
+    projects: [
+      { title: "The Atlantic on Hutchinson Island", contractor: "Centerline Utilities, Inc.", address: "27°26'04.3\"N 80°16'53.2\"W", bidDate: "Oct 28, 2025", id: 1908 }
+    ]
+  },
+  {
+    id: 8, day: 1, stop: 8,
+    name: "Tilton Road / Silver Oaks – Martin County",
+    lat: 27.330, lng: -80.310,
+    arrivalTime: "12:00 PM",
+    projects: [
+      { title: "Tilton Road Watershed Phase II", contractor: "Centerline Utilities, Inc.", address: "27.326322, -80.309399", bidDate: "Nov 7, 2025", id: 1842 },
+      { title: "Silver Oaks Community", contractor: "Downrite Engineering", address: "27.330369, -80.309734", bidDate: "Oct 3, 2025", id: 1848 }
+    ]
+  },
+  {
+    id: 9, day: 1, stop: 9,
+    name: "Ravenswood Lane WM Replacement",
+    lat: 27.316, lng: -80.351,
+    arrivalTime: "12:15 PM",
+    projects: [
+      { title: "Project Ravenswood Lane WM Replacement", contractor: "Felix Civil Construction", address: "27°18'56.0\"N 80°21'04.8\"W", bidDate: "Sep 19, 2025", id: 1596 }
+    ]
+  },
+  {
+    id: 10, day: 1, stop: 10,
+    name: "Sandpiper Bay Resort",
+    lat: 27.330, lng: -80.390,
+    arrivalTime: "12:30 PM",
+    projects: [
+      { title: "Sandpiper Bay Resort", contractor: "LTG Sport Turf One, Inc", address: "Sandpiper Bay Resort, Port St. Lucie, FL", bidDate: "Oct 20, 2025", id: 1773 }
+    ]
+  },
+  {
+    id: 11, day: 1, stop: 11,
+    name: "LTC Ranch POD 2 Amenity Center",
+    lat: 27.363, lng: -80.434,
+    arrivalTime: "12:50 PM",
+    projects: [
+      { title: "LTC Ranch POD 2 Amenity Center", contractor: "Southern Development Group", address: "27.362868, -80.434049", bidDate: "Sep 22, 2025", id: 1884 }
+    ]
+  },
+  {
+    id: 12, day: 1, stop: 12,
+    name: "Reverie at Solaeris",
+    lat: 27.297, lng: -80.484,
+    arrivalTime: "1:20 PM",
+    projects: [
+      { title: "Reverie at Solaeris", contractor: "Southern Development Group", address: "27.2973453, -80.4844633", bidDate: "Feb 5, 2026", id: 17833 }
+    ]
+  },
+  {
+    id: 13, day: 1, stop: 13,
+    name: "Tradition / Four PSL / Lotis Cluster",
+    lat: 27.268, lng: -80.455,
+    arrivalTime: "1:40 PM",
+    projects: [
+      { title: "Lotis", contractor: "South Florida Grading, Inc", address: "27.277251, -80.464258", bidDate: "Oct 9, 2025", id: 1635 },
+      { title: "Four PSL Destination Way", contractor: "H & J Contracting", address: "27.241821, -80.418674", bidDate: "Oct 9, 2025", id: 1662 },
+      { title: "Four PSL Lot 3A", contractor: "H & J Contracting", address: "27.241821, -80.418674", bidDate: "Oct 9, 2025", id: 1833 },
+      { title: "Four PSL Lot 3B & Mass Grading", contractor: "H & J Contracting", address: "27.241821, -80.418674", bidDate: "Oct 9, 2025", id: 1797 },
+      { title: "Tradition Pkwy Port St Lucie", contractor: "Firethornbuilt", address: "27.271028, -80.465720", bidDate: "Aug 15, 2025", id: 1899 }
+    ]
+  },
+  {
+    id: 14, day: 1, stop: 14,
+    name: "SFWMD C-23/24 / FOUR PSL PV1",
+    lat: 27.262, lng: -80.444,
+    arrivalTime: "2:00 PM",
+    projects: [
+      { title: "SFWMD Indian River Lagoon S. C-23/24", contractor: "Ryan Incorporated Southern", address: "9499 Germany Canal Road, Port St. Lucie, FL 34987", bidDate: "Sep 16, 2025", id: 1788 },
+      { title: "FOUR PSL PV1", contractor: "THE REDLAND COMPANY, INC.", address: "12440 SW Village Pkwy, Port St. Lucie, FL 34987", bidDate: "Sep 24, 2025", id: 1668 }
+    ]
+  },
+  {
+    id: 15, day: 1, stop: 15,
+    name: "Gtilin Plaza / BTH Tradition / Four PSL",
+    lat: 27.247, lng: -80.417,
+    arrivalTime: "2:15 PM",
+    projects: [
+      { title: "Gtilin Plaza", contractor: "Centerline Utilities, Inc.", address: "27.259496, -80.416705", bidDate: "Oct 28, 2025", id: 1755 },
+      { title: "BTH Tradition Commerce Park", contractor: "H & J Contracting", address: "27.245086, -80.417731", bidDate: "Aug 14, 2025", id: 1917 }
+    ]
+  },
+  {
+    id: 16, day: 1, stop: 16,
+    name: "Tesla – Port St. Lucie",
+    lat: 27.209, lng: -80.405,
+    arrivalTime: "2:45 PM",
+    projects: [
+      { title: "Tesla", contractor: "Prince Land Inc", address: "27.208839, -80.404673", bidDate: "Aug 4, 2025", id: 1758 }
+    ]
+  },
+  {
+    id: 17, day: 1, stop: 17,
+    name: "Bluekey",
+    lat: 27.271, lng: -80.365,
+    arrivalTime: "3:10 PM",
+    projects: [
+      { title: "Bluekey", contractor: "Prince Land Inc", address: "27.270804, -80.364635", bidDate: "Aug 4, 2025", id: 1692 }
+    ]
+  },
+  {
+    id: 18, day: 1, stop: 18,
+    name: "T4727 – Jensen Beach Causeway",
+    lat: 27.253, lng: -80.221,
+    arrivalTime: "3:40 PM",
+    projects: [
+      { title: "T4727", contractor: "Florida Engineering & Development", address: "From NE Shore Village Terrace to SR 732 (Jensen Beach Causeway)", bidDate: "Oct 29, 2025", id: 1815 }
+    ]
+  },
+  {
+    id: 19, day: 1, stop: 19,
+    name: "Martin County Shoreline / Purchasing",
+    lat: 27.221, lng: -80.178,
+    arrivalTime: "4:00 PM",
+    projects: [
+      { title: "Martin County Shoreline Stabilization & Restoration RFB-3697", contractor: "Eastman Aggregates, Inc.", address: "27.221396, -80.177913", bidDate: "Aug 8, 2025", id: 1602 },
+      { title: "Martin County Shoreline Stabilization Services", contractor: "Dickerson Florida, Inc", address: "27.221396, -80.177913", bidDate: "Aug 8, 2025", id: 1623 },
+      { title: "Martin County Purchasing", contractor: "Central Florida Transport, LLC", address: "2401 SE Monterey Rd #1, Stuart, FL 34996", bidDate: "Sep 8, 2025", id: 1854 }
+    ]
+  },
+  {
+    id: 20, day: 1, stop: 20,
+    name: "Walmart Stuart",
+    lat: 27.169, lng: -80.197,
+    arrivalTime: "4:25 PM",
+    projects: [
+      { title: "Walmart Stuart", contractor: "Legends Site & Underground Development LLC", address: "4001 SE Federal Hwy, Stuart, FL 34997", bidDate: "Oct 20, 2025", id: 1686 }
+    ]
+  },
+  {
+    id: 21, day: 1, stop: 21,
+    name: "5536 SE Horizon Ave – Stuart",
+    lat: 27.149, lng: -80.210,
+    arrivalTime: "4:40 PM",
+    projects: [
+      { title: "5536 SE Horizon Ave, Stuart, FL 34997", contractor: "ITG Civil Division", address: "5536 SE Horizon Ave, Stuart, FL 34997", bidDate: "Oct 31, 2025", id: 1653 }
+    ]
+  },
+  {
+    id: 22, day: 1, stop: 22,
+    name: "Coral Garden Vacuum Sewer System",
+    lat: 27.148, lng: -80.225,
+    arrivalTime: "4:50 PM",
+    projects: [
+      { title: "Coral Garden Vacuum Sewer System", contractor: "Felix Civil Construction", address: "27°08'53.1\"N 80°13'28.2\"W", bidDate: "Sep 19, 2025", id: 1683 }
+    ]
+  },
+  // DAY 2
+  {
+    id: 23, day: 2, stop: 1,
+    name: "Wawa Stuart / SR-714 Multimodal",
+    lat: 27.178, lng: -80.234,
+    arrivalTime: "8:00 AM",
+    projects: [
+      { title: "Wawa #5483 Stuart, FL", contractor: "Triton Construction Group", address: "SW Kanner Hwy & SW Locks Rd, Stuart, FL 34997", bidDate: "Sep 8, 2025", id: 1704 },
+      { title: "SR-714 / SE Monterey Road Multimodal Pathway", contractor: "J.W. Cheatham, LLC", address: "27.178661, -80.233557", bidDate: "Nov 4, 2025", id: 1794 },
+      { title: "Wawa Kanner & Locks Stuart", contractor: "Owl Services", address: "27.102251, -80.268551", bidDate: "Sep 8, 2025", id: 1905 }
+    ]
+  },
+  {
+    id: 24, day: 2, stop: 2,
+    name: "MIM Atlantic Point Marina",
+    lat: 27.206, lng: -80.261,
+    arrivalTime: "8:20 AM",
+    projects: [
+      { title: "MIM Atlantic Point Marina", contractor: "Centerline Utilities, Inc.", address: "27.206262, -80.260638", bidDate: "Oct 28, 2025", id: 1671 }
+    ]
+  },
+  {
+    id: 25, day: 2, stop: 3,
+    name: "Capri Harbor Marina – Stuart",
+    lat: 27.180, lng: -80.252,
+    arrivalTime: "8:35 AM",
+    projects: [
+      { title: "Capri Harbor Marina", contractor: "Marina Fueling LLC", address: "54 NW Dixie Hwy, Stuart, FL 34994", bidDate: "Sep 22, 2025", id: 1782 }
+    ]
+  },
+  {
+    id: 26, day: 2, stop: 4,
+    name: "Publix – Palm City",
+    lat: 27.162, lng: -80.266,
+    arrivalTime: "8:55 AM",
+    projects: [
+      { title: "Publix 1395 SW Martin Hwy", contractor: "K N L, Inc.", address: "1395 SW Martin Hwy, Palm City, FL 34990", bidDate: "Aug 15, 2025", id: 1644 }
+    ]
+  },
+  {
+    id: 27, day: 2, stop: 5,
+    name: "Cove Royale PH 2",
+    lat: 27.118, lng: -80.232,
+    arrivalTime: "9:20 AM",
+    projects: [
+      { title: "Cove Royale PH 2 (ID 1620)", contractor: "J.W. Cheatham, LLC", address: "27.118086, -80.227234", bidDate: "Oct 7, 2025", id: 1620 },
+      { title: "Cove Royale PH 2 (ID 1890)", contractor: "J.W. Cheatham, LLC", address: "27.118494, -80.232094", bidDate: "Sep 8, 2025", id: 1890 }
+    ]
+  },
+  {
+    id: 28, day: 2, stop: 6,
+    name: "Boys & Girls Club – Hobe Sound",
+    lat: 27.064, lng: -80.135,
+    arrivalTime: "9:50 AM",
+    projects: [
+      { title: "Boys & Girls Club Hobe Sound", contractor: "Smith & Company", address: "27.064329, -80.135344", bidDate: "Aug 14, 2025", id: 1734 }
+    ]
+  },
+  {
+    id: 29, day: 2, stop: 7,
+    name: "Indiantown WWTP",
+    lat: 27.033, lng: -80.501,
+    arrivalTime: "10:45 AM",
+    projects: [
+      { title: "Indiantown WWTP Job #2024-1625WWT", contractor: "Florida Aquastore & Utility Construction, Inc.", address: "14853 SW 168th Ave, Indiantown, FL 34956", bidDate: "Aug 8, 2025", id: 1791 }
+    ]
+  },
+  {
+    id: 30, day: 2, stop: 8,
+    name: "McCarty Ranch Herman Canal",
+    lat: 27.207, lng: -80.534,
+    arrivalTime: "11:30 AM",
+    projects: [
+      { title: "McCarty Ranch Herman Canal", contractor: "Environmental Land Development, Inc", address: "27.206736, -80.534405", bidDate: "Aug 27, 2025", id: 1764 }
+    ]
+  },
+  {
+    id: 31, day: 2, stop: 9,
+    name: "C-23 Phase 2 / Indian River Lagoon Reservoir",
+    lat: 27.367, lng: -80.603,
+    arrivalTime: "12:15 PM",
+    projects: [
+      { title: "C-23 Phase 2", contractor: "Arcosa Aggregates", address: "27.362808, -80.618766", bidDate: "Sep 16, 2025", id: 1812 },
+      { title: "Indian River Lagoon South – C-23/24 South Reservoir", contractor: "Thalle Construction Corp", address: "27°22'18.6\"N 80°35'17.4\"W", bidDate: "Sep 29, 2025", id: 1716 },
+      { title: "Indian River Lagoon South – C-23/24/25 South Reservoir", contractor: "Micar Trucking, Inc", address: "27.371218, -80.588159", bidDate: "Oct 7, 2025", id: 1851 }
+    ]
+  },
+  {
+    id: 32, day: 2, stop: 10,
+    name: "FPL Bassinger Substation – Okeechobee",
+    lat: 27.461, lng: -80.831,
+    arrivalTime: "1:15 PM",
+    projects: [
+      { title: "FPL _ Bassinger Substation", contractor: "Harty Tractor Services, Inc.", address: "19712 US-98, Okeechobee, FL 34972", bidDate: "Oct 21, 2025", id: 1728 }
+    ]
+  },
+  {
+    id: 33, day: 2, stop: 11,
+    name: "7-Eleven / Chipotle – Okeechobee",
+    lat: 27.244, lng: -80.837,
+    arrivalTime: "2:00 PM",
+    projects: [
+      { title: "7-Eleven Okeechobee FL (ID 1809)", contractor: "Owl Services", address: "27.278693, -80.829165", bidDate: "Nov 5, 2025", id: 1809 },
+      { title: "7-Eleven Okeechobee FL (ID 1914)", contractor: "Prince Land Inc", address: "27.278693, -80.829165", bidDate: "Nov 4, 2025", id: 1914 },
+      { title: "Chipotle Okeechobee", contractor: "Blue Water Engineering & Development", address: "2655 US-441, Okeechobee, FL 34974", bidDate: "Oct 3, 2025", id: 1878 }
+    ]
+  }
+];
+
+// ── MAP INIT ──────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([27.28, -80.45], 9);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap © CARTO',
+  maxZoom: 19
+}).addTo(map);
+
+// ── MARKERS ───────────────────────────────────────────────────────────────────
+const markerLayer = L.layerGroup().addTo(map);
+const markers = {};
+
+function createMarker(stop) {
+  const color = stop.day === 1 ? '#f5a623' : '#38bdf8';
+  const textColor = '#1a1a1a';
+  const isMulti = stop.projects.length > 1;
+
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="
+      width:32px; height:32px;
+      background:${color};
+      border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg);
+      border:2px solid rgba(0,0,0,0.35);
+      box-shadow:0 3px 10px rgba(0,0,0,0.5);
+      display:flex; align-items:center; justify-content:center;
+      ${isMulti ? 'border:2px solid white;' : ''}
+    ">
+      <span style="transform:rotate(45deg); font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:11px; color:${textColor};">${stop.stop}</span>
+    </div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -34]
+  });
+
+  const m = L.marker([stop.lat, stop.lng], { icon })
+    .addTo(markerLayer)
+    .on('click', () => showDetail(stop.id));
+
+  markers[stop.id] = m;
+}
+
+stops.forEach(createMarker);
+
+// Draw route lines
+function drawRoutes() {
+  const day1 = stops.filter(s => s.day === 1).sort((a,b) => a.stop - b.stop);
+  const day2 = stops.filter(s => s.day === 2).sort((a,b) => a.stop - b.stop);
+
+  L.polyline(day1.map(s => [s.lat, s.lng]), {
+    color: '#f5a623', weight: 2.5, opacity: 0.55, dashArray: '6 4'
+  }).addTo(map);
+
+  L.polyline(day2.map(s => [s.lat, s.lng]), {
+    color: '#38bdf8', weight: 2.5, opacity: 0.55, dashArray: '6 4'
+  }).addTo(map);
+}
+drawRoutes();
+
+// ── SIDEBAR ───────────────────────────────────────────────────────────────────
+function buildSidebar(filter = 'all', search = '') {
+  const list = document.getElementById('stopList');
+  list.innerHTML = '';
+
+  const days = filter === 'all' ? [1, 2] : [parseInt(filter)];
+
+  days.forEach(day => {
+    const dayStops = stops.filter(s => {
+      if (s.day !== day) return false;
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return s.name.toLowerCase().includes(q) ||
+        s.projects.some(p => p.title.toLowerCase().includes(q) || (p.contractor||'').toLowerCase().includes(q));
+    });
+
+    if (!dayStops.length) return;
+
+    const hdr = document.createElement('div');
+    hdr.className = 'day-header';
+    hdr.innerHTML = `
+      <div class="day-dot" style="background:${day===1?'#f5a623':'#38bdf8'}"></div>
+      <span style="color:${day===1?'#f5a623':'#38bdf8'}">Day ${day}</span>
+      <div class="day-line"></div>
+      <span style="color:var(--text-muted);font-size:10px;">${dayStops.length} stops</span>
+    `;
+    list.appendChild(hdr);
+
+    dayStops.sort((a,b) => a.stop - b.stop).forEach(stop => {
+      const card = document.createElement('div');
+      card.className = `stop-card day${stop.day}`;
+      card.id = `card-${stop.id}`;
+      const isMulti = stop.projects.length > 1;
+      const contractors = [...new Set(stop.projects.map(p => p.contractor).filter(Boolean))];
+      card.innerHTML = `
+        <div class="stop-num">Stop ${stop.stop} · ${stop.arrivalTime}</div>
+        <div class="stop-name">${stop.name}</div>
+        <div class="stop-address">${stop.projects[0].address}</div>
+        <div class="stop-tags">
+          ${contractors.slice(0,1).map(c => `<span class="tag tag-contractor">${c.length > 28 ? c.slice(0,28)+'…' : c}</span>`).join('')}
+          ${isMulti ? `<span class="tag tag-multi">${stop.projects.length} projects</span>` : ''}
+        </div>
+      `;
+      card.onclick = () => { showDetail(stop.id); scrollToMarker(stop); };
+      list.appendChild(card);
+    });
+  });
+}
+
+// ── DETAIL PANEL ──────────────────────────────────────────────────────────────
+let activeId = null;
+
+function showDetail(id) {
+  const stop = stops.find(s => s.id === id);
+  if (!stop) return;
+  activeId = id;
+
+  // Highlight card
+  document.querySelectorAll('.stop-card').forEach(c => c.classList.remove('active'));
+  const card = document.getElementById(`card-${id}`);
+  if (card) { card.classList.add('active'); card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+
+  const color = stop.day === 1 ? '#f5a623' : '#38bdf8';
+  const panel = document.getElementById('detailPanel');
+
+  document.getElementById('dpBadge').textContent = `Day ${stop.day} · Stop ${stop.stop}`;
+  document.getElementById('dpBadge').style.background = `${color}22`;
+  document.getElementById('dpBadge').style.color = color;
+  document.getElementById('dpName').textContent = stop.name;
+
+  let html = `
+    <div class="detail-row">
+      <div class="detail-label">Arrival</div>
+      <div class="detail-value highlight">${stop.arrivalTime}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Coords</div>
+      <div class="detail-value" style="font-size:11px;color:var(--text-muted)">${stop.lat.toFixed(4)}, ${stop.lng.toFixed(4)}</div>
+    </div>
+  `;
+
+  if (stop.projects.length === 1) {
+    const p = stop.projects[0];
+    html += `
+      <div class="detail-row"><div class="detail-label">Project</div><div class="detail-value">${p.title}</div></div>
+      <div class="detail-row"><div class="detail-label">Contractor</div><div class="detail-value">${p.contractor || '—'}</div></div>
+      <div class="detail-row"><div class="detail-label">Address</div><div class="detail-value" style="font-size:11px">${p.address}</div></div>
+      <div class="detail-row"><div class="detail-label">Bid Date</div><div class="detail-value">${p.bidDate}</div></div>
+      <div class="detail-row"><div class="detail-label">Record ID</div><div class="detail-value" style="color:var(--text-muted)">#${p.id}</div></div>
+    `;
+  } else {
+    html += `<div class="multi-badge">${stop.projects.length} projects at this location</div>`;
+    html += `<div class="project-list">`;
+    stop.projects.forEach(p => {
+      html += `
+        <div class="project-item">
+          <div class="project-item-name">${p.title}</div>
+          <div class="project-item-detail">Contractor: ${p.contractor || '—'}</div>
+          <div class="project-item-detail">Bid Date: ${p.bidDate} · ID #${p.id}</div>
+        </div>
+      `;
+    });
+    html += `</div>`;
+  }
+
+  document.getElementById('dpBody').innerHTML = html;
+  panel.classList.add('visible');
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('visible');
+  document.querySelectorAll('.stop-card').forEach(c => c.classList.remove('active'));
+  activeId = null;
+}
+
+function scrollToMarker(stop) {
+  map.setView([stop.lat, stop.lng], 12, { animate: true });
+}
+
+// ── FILTERS ───────────────────────────────────────────────────────────────────
+let currentDayFilter = 'all';
+let currentSearch = '';
+
+function filterDay(day) {
+  currentDayFilter = day;
+  document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+  if (day === 'all') document.querySelector('.day-btn.all').classList.add('active');
+  else document.querySelector(`.day-btn.d${day}`).classList.add('active');
+
+  // Show/hide markers
+  stops.forEach(stop => {
+    const m = markers[stop.id];
+    if (!m) return;
+    if (day === 'all' || stop.day === day) {
+      if (!markerLayer.hasLayer(m)) markerLayer.addLayer(m);
+    } else {
+      markerLayer.removeLayer(m);
+    }
+  });
+
+  buildSidebar(currentDayFilter, currentSearch);
+}
+
+function filterSearch(val) {
+  currentSearch = val;
+  buildSidebar(currentDayFilter, currentSearch);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+buildSidebar();
+</script>
+</body>
+</html>
