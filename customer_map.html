@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATPB Customer Map — Palm Beach & Treasure Coast</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --accent: #00d4aa;
+    --accent2: #ff6b35;
+    --accent3: #7c3aed;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --customer: #00d4aa;
+    --prospect: #ff6b35;
+    --notype: #7c3aed;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    z-index: 1000;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  h1 {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  h1 span {
+    color: var(--accent);
+  }
+
+  .subtitle {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  .stats {
+    display: flex;
+    gap: 16px;
+  }
+
+  .stat {
+    text-align: right;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .stat-num {
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-top: 2px;
+  }
+
+  .controls {
+    padding: 8px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .filter-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-family: 'DM Mono', monospace;
+    margin-right: 4px;
+  }
+
+  .filter-btn {
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .filter-btn:hover { border-color: var(--text); color: var(--text); }
+  .filter-btn.active-all { border-color: var(--text); color: var(--text); background: rgba(255,255,255,0.05); }
+  .filter-btn.active-customer { border-color: var(--customer); color: var(--customer); background: rgba(0,212,170,0.08); }
+  .filter-btn.active-prospect { border-color: var(--prospect); color: var(--prospect); background: rgba(255,107,53,0.08); }
+  .filter-btn.active-notype { border-color: var(--notype); color: var(--notype); background: rgba(124,58,237,0.08); }
+
+  .divider { width: 1px; height: 20px; background: var(--border); }
+
+  .search-wrap {
+    margin-left: auto;
+    position: relative;
+  }
+
+  #search {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 5px 10px 5px 28px;
+    width: 200px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  #search:focus { border-color: var(--accent); }
+  #search::placeholder { color: var(--muted); }
+
+  .search-icon {
+    position: absolute;
+    left: 8px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 12px;
+    pointer-events: none;
+  }
+
+  #map {
+    flex: 1;
+    width: 100%;
+  }
+
+  /* Cluster overrides */
+  .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large {
+    background: rgba(0, 212, 170, 0.15) !important;
+  }
+  .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div {
+    background: rgba(0, 212, 170, 0.6) !important;
+    color: #0d1117 !important;
+    font-family: 'DM Mono', monospace !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
+  }
+
+  /* Popup styling */
+  .leaflet-popup-content-wrapper {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+    color: var(--text) !important;
+  }
+
+  .leaflet-popup-tip { background: var(--surface) !important; }
+
+  .popup-name {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .popup-addr {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    line-height: 1.4;
+  }
+
+  .popup-type {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .type-Customer { background: rgba(0,212,170,0.15); color: var(--customer); border: 1px solid rgba(0,212,170,0.3); }
+  .type-Prospect { background: rgba(255,107,53,0.15); color: var(--prospect); border: 1px solid rgba(255,107,53,0.3); }
+  .type-Other { background: rgba(124,58,237,0.15); color: var(--notype); border: 1px solid rgba(124,58,237,0.3); }
+
+  .zone-badge {
+    margin-top: 5px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .legend {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    z-index: 999;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 11px;
+  }
+
+  .legend-title {
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 8px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .legend-item span { color: var(--text); font-family: 'DM Mono', monospace; font-size: 11px; }
+
+  /* Sidebar for zone list */
+  .sidebar {
+    position: absolute;
+    top: 0; right: 0;
+    width: 280px;
+    height: 100%;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    z-index: 998;
+    overflow-y: auto;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    padding: 16px;
+  }
+
+  .sidebar.open { transform: translateX(0); }
+
+  .sidebar-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    z-index: 999;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-right: none;
+    border-radius: 6px 0 0 6px;
+    padding: 10px 6px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 14px;
+    transition: color 0.15s;
+  }
+
+  .sidebar-toggle:hover { color: var(--text); }
+
+  .zone-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .zone-card:hover { border-color: var(--accent); }
+
+  .zone-card-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--accent);
+    margin-bottom: 3px;
+  }
+
+  .zone-card-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .zone-companies {
+    margin-top: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📍</div>
+    <div>
+      <h1>ATPB <span>Customer Map</span></h1>
+      <div class="subtitle">Palm Beach & Treasure Coast, Florida</div>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-num" style="color:var(--accent)" id="stat-shown">—</div>
+      <div class="stat-label">Mapped</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" style="color:var(--accent2)" id="stat-clusters">—</div>
+      <div class="stat-label">Visit Zones</div>
+    </div>
+  </div>
+</header>
+
+<div class="controls">
+  <span class="filter-label">Filter</span>
+  <button class="filter-btn active-all" id="btn-all" onclick="filterMarkers('all')">All</button>
+  <button class="filter-btn" id="btn-customer" onclick="filterMarkers('Customer')">● Customers</button>
+  <button class="filter-btn" id="btn-prospect" onclick="filterMarkers('Prospect')">● Prospects</button>
+  <button class="filter-btn" id="btn-notype" onclick="filterMarkers('Other')">● Contacts</button>
+  <div class="divider"></div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input id="search" placeholder="Search company..." oninput="searchMarkers(this.value)">
+  </div>
+</div>
+
+<div id="map"></div>
+
+<div class="legend">
+  <div class="legend-title">Legend</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--customer)"></div><span>Customer</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--prospect)"></div><span>Prospect</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--notype)"></div><span>Contact / Other</span></div>
+  <div class="legend-item" style="margin-top:8px"><div class="legend-dot" style="background:rgba(255,107,53,0.3);border:1px dashed var(--accent2);border-radius:2px;width:16px;height:10px"></div><span>5×5 mi Visit Zone</span></div>
+</div>
+
+<script>
+// ─── DATA ──────────────────────────────────────────────────────────────
+const companies = [
+  // West Palm Beach cluster - downtown/central
+  { name:"City of West Palm Beach", addr:"401 Clematis Street, West Palm Beach", type:"Other", lat:26.7153, lng:-80.0534 },
+  { name:"Land Developers Consortium", addr:"524 Datura St, West Palm Beach", type:"Other", lat:26.7127, lng:-80.0532 },
+  { name:"Leo A Daly - West Palm Beach", addr:"1400 Centrepark Blvd, West Palm Beach", type:"Other", lat:26.7092, lng:-80.0621 },
+  { name:"REG Architects", addr:"120 South Olive Ave, West Palm Beach", type:"Other", lat:26.7121, lng:-80.0531 },
+  { name:"Urban Design Studio of South Florida", addr:"610 Clematis Street, West Palm Beach", type:"Other", lat:26.7157, lng:-80.0558 },
+  { name:"Alfonso Hernandez Architect, LLC", addr:"314 Clematis Street, West Palm Beach", type:"Other", lat:26.7155, lng:-80.0540 },
+  { name:"Posillico Civil, Inc.", addr:"319 Clematis Street, West Palm Beach", type:"Customer", lat:26.7155, lng:-80.0541 },
+  { name:"Health Care District of Palm Beach County", addr:"1515 North Flagler Drive, West Palm Beach", type:"Other", lat:26.7241, lng:-80.0531 },
+  { name:"Civil Design, Inc.", addr:"1400 Centrepark Blvd, West Palm Beach", type:"Other", lat:26.7092, lng:-80.0623 },
+  { name:"Gast Construction Group Inc", addr:"333 Southern Blvd, West Palm Beach", type:"Other", lat:26.7010, lng:-80.0530 },
+
+  // WPB Vista Parkway / Congress Ave corridor
+  { name:"Carollo Engineers Inc - Palm Beach", addr:"2056 Vista Pkwy Ste 150, West Palm Beach", type:"Other", lat:26.6832, lng:-80.1230 },
+  { name:"A.D.A. Engineering, Inc.", addr:"1800 Old Okeechobee Road, West Palm Beach", type:"Other", lat:26.7210, lng:-80.1030 },
+  { name:"Kimley-Horn - West Palm Beach", addr:"1920 Wekiva Way, West Palm Beach", type:"Other", lat:26.6920, lng:-80.1190 },
+  { name:"Tierra South Florida", addr:"2765 Vista Parkway, West Palm Beach", type:"Other", lat:26.6920, lng:-80.1218 },
+  { name:"SR Construction Services", addr:"9340 Nugent Trail, West Palm Beach", type:"Other", lat:26.6950, lng:-80.1241 },
+  { name:"Quest Contracting Services", addr:"5715 Corporate Way, West Palm Beach", type:"Other", lat:26.6870, lng:-80.1020 },
+  { name:"Quantum Electrical Engineering, Inc.", addr:"2755 Vista Parkway, West Palm Beach", type:"Other", lat:26.6921, lng:-80.1219 },
+  { name:"Mock Roos & Associates, Inc.", addr:"5720 Corporate Way, West Palm Beach", type:"Other", lat:26.6871, lng:-80.1021 },
+  { name:"Scalar Consulting Group (SCG)", addr:"5713 Corporate Way, West Palm Beach", type:"Other", lat:26.6869, lng:-80.1022 },
+  { name:"Simmons & White, Inc.", addr:"2581 Metrocentre Blvd, West Palm Beach", type:"Other", lat:26.6901, lng:-80.1030 },
+  { name:"KAST Construction - West Palm Beach", addr:"701 Northpoint Parkway, West Palm Beach", type:"Other", lat:26.6880, lng:-80.0980 },
+  { name:"Franjo Builders", addr:"5715 Corporate Way, West Palm Beach", type:"Other", lat:26.6872, lng:-80.1023 },
+  { name:"Palm Beach County - Capital Improvements", addr:"2633 Vista Parkway, West Palm Beach", type:"Other", lat:26.6923, lng:-80.1220 },
+  { name:"RJ Engineering & Construction", addr:"2101 Vista Parkway, West Palm Beach", type:"Customer", lat:26.6918, lng:-80.1215 },
+  { name:"C & W Engineering", addr:"2775 Vista Parkway, West Palm Beach", type:"Other", lat:26.6924, lng:-80.1221 },
+  { name:"Palm Beach County - Roadway Production", addr:"2300 North Jog Road, West Palm Beach", type:"Other", lat:26.7010, lng:-80.1150 },
+  { name:"Erdman Anthony - West Palm Beach", addr:"5405 Okeechobee Blvd, West Palm Beach", type:"Other", lat:26.7141, lng:-80.1143 },
+  { name:"Smith Engineering Consultants", addr:"2161 Palm Beach Lakes Blvd, West Palm Beach", type:"Other", lat:26.7245, lng:-80.0980 },
+  { name:"Brown and Phillips, INC.", addr:"1860 Old Okeechobee Road, West Palm Beach", type:"Other", lat:26.7213, lng:-80.1034 },
+  { name:"Bliss & Nyitray, Inc.", addr:"580 Village Blvd, West Palm Beach", type:"Other", lat:26.7032, lng:-80.0810 },
+  { name:"Calvin, Giordano & Associates", addr:"580 Village Blvd, West Palm Beach", type:"Other", lat:26.7033, lng:-80.0811 },
+  { name:"Stormwater J Engineering", addr:"1855 Indian Road, West Palm Beach", type:"Other", lat:26.7210, lng:-80.1035 },
+  { name:"Engenuity Group, Inc.", addr:"1280 North Congress Ave, West Palm Beach", type:"Other", lat:26.7230, lng:-80.1001 },
+  { name:"Hedrick Brothers Construction", addr:"2200 Centrepark West Drive, West Palm Beach", type:"Other", lat:26.7099, lng:-80.0634 },
+  { name:"Palm Beach County - Purchasing", addr:"50 South Military Trail, West Palm Beach", type:"Other", lat:26.6940, lng:-80.1040 },
+  { name:"Palm Beach County Water Utility", addr:"8100 Forest Hill Blvd, West Palm Beach", type:"Other", lat:26.6630, lng:-80.1090 },
+  { name:"Michael B. Schorah and Associates", addr:"1850 Forest Hills Blvd, West Palm Beach", type:"Other", lat:26.6642, lng:-80.1092 },
+  { name:"Verdex Construction - West Palm Beach", addr:"1501 Belvedere Road, West Palm Beach", type:"Other", lat:26.6970, lng:-80.0730 },
+  { name:"Florida Design Contractors, Inc.", addr:"1326 South Killian Drive, West Palm Beach", type:"Other", lat:26.7770, lng:-80.0930 },
+  { name:"CK Contractors & Development LLC", addr:"1100 Technology Place, West Palm Beach", type:"Customer", lat:26.6800, lng:-80.1100 },
+  { name:"All-Site Construction Inc.", addr:"2915 East Tamarind Ave, West Palm Beach", type:"Other", lat:26.7290, lng:-80.0550 },
+
+  // WPB North (33412 area)
+  { name:"INDIAN TRAILS IMPROVEMENT DISTRICT", addr:"13476 61st Street North, West Palm Beach", type:"Customer", lat:26.8310, lng:-80.1820 },
+  { name:"Andrea Construction Inc", addr:"12334 77th Place North, West Palm Beach", type:"Other", lat:26.8210, lng:-80.1850 },
+  { name:"YC Group, LLC", addr:"12668 77th Place North, West Palm Beach", type:"Other", lat:26.8218, lng:-80.1851 },
+  { name:"Solid Waste Authority Palm Beach County", addr:"7501 North Jog Road, West Palm Beach", type:"Other", lat:26.8031, lng:-80.1402 },
+  { name:"TCLM Enterprise INC", addr:"13720 Hamlin Blvd, West Palm Beach", type:"Other", lat:26.8320, lng:-80.1822 },
+  { name:"Lox Construction", addr:"12364 85th Road North, West Palm Beach", type:"Other", lat:26.8212, lng:-80.1870 },
+  { name:"Headway Construction LLC", addr:"12586 79th Court North, West Palm Beach", type:"Other", lat:26.8215, lng:-80.1855 },
+  { name:"J.W. Cheatham, LLC", addr:"7396 Westport Place, West Palm Beach", type:"Customer", lat:26.6590, lng:-80.1180 },
+
+  // Palm Beach Gardens / North Palm Beach
+  { name:"Jacobs Engineering Group Inc", addr:"3300 PGA Blvd Suite 780, Palm Beach Gardens", type:"Other", lat:26.8330, lng:-80.1270 },
+  { name:"Sabatello Companies", addr:"9002 Burma Road, Palm Beach Gardens", type:"Customer", lat:26.8521, lng:-80.1103 },
+  { name:"Northern Palm Beach County Improvement District", addr:"359 Hiatt Drive, Palm Beach Gardens", type:"Other", lat:26.8340, lng:-80.1250 },
+  { name:"National General Construction Inc", addr:"643 US Hwy 1, North Palm Beach", type:"Customer", lat:26.8180, lng:-80.0560 },
+  { name:"American Homestead Construction, LLC", addr:"100 Lehane Terrace, North Palm Beach", type:"Other", lat:26.8200, lng:-80.0590 },
+  { name:"SoCal Shaker Plates & Construction Site Services LLC", addr:"643 US Highway 1, North Palm Beach", type:"Other", lat:26.8181, lng:-80.0562 },
+  { name:"Perez-Borroto Construction LLC dba TrueBuild Group", addr:"8895 North Military Trail, North Palm Beach", type:"Other", lat:26.8220, lng:-80.0870 },
+  { name:"Pulte Homes", addr:"4400 PGA Blvd, North Palm Beach", type:"Other", lat:26.8310, lng:-80.1260 },
+  { name:"Pajaziti & Associates", addr:"11911 U.S. 1, North Palm Beach", type:"Other", lat:26.8680, lng:-80.0520 },
+  { name:"Blackfin Partners", addr:"4440 PGA Blvd, Palm Beach", type:"Other", lat:26.8315, lng:-80.1258 },
+
+  // Town of Palm Beach / South Palm Beach
+  { name:"Town of Palm Beach", addr:"360 South County Road, Palm Beach", type:"Other", lat:26.7050, lng:-80.0370 },
+  { name:"Town of South Palm Beach", addr:"3577 South Ocean Blvd, South Palm Beach", type:"Other", lat:26.5720, lng:-80.0520 },
+
+  // Wellington / Royal Palm Beach area
+  { name:"IDA Development", addr:"13833 Wellington Trace Blvd, Wellington", type:"Other", lat:26.6620, lng:-80.2680 },
+  { name:"MJC Land Development", addr:"1127 Royal Palm Beach Blvd, Royal Palm Beach", type:"Other", lat:26.7050, lng:-80.2210 },
+  { name:"Nichols Contracting", addr:"260 Business Park Way, Royal Palm Beach", type:"Other", lat:26.6980, lng:-80.2190 },
+  { name:"Highstyle Engineering & Construction Services LLC", addr:"5521 Mainship Dr, Greenacres", type:"Other", lat:26.6410, lng:-80.1270 },
+  { name:"Campany Roof Maintenance", addr:"1425 Watertower Road, West Palm Beach", type:"Other", lat:26.7520, lng:-80.1020 },
+  { name:"Vanguard Construction", addr:"903 43rd Street, West Palm Beach", type:"Other", lat:26.7310, lng:-80.0710 },
+  { name:"Overland Construction", addr:"1360 W. 53rd St, West Palm Beach", type:"Other", lat:26.7420, lng:-80.0750 },
+
+  // Stuart cluster
+  { name:"Kirchman Construction Co.", addr:"1241 Southeast Indian Street, Stuart", type:"Customer", lat:27.1810, lng:-80.2210 },
+  { name:"McTeague Construction Co. Inc.", addr:"624 Southeast Central Pkwy, Stuart", type:"Customer", lat:27.1892, lng:-80.2451 },
+  { name:"Pav- Co Contracting, Inc.", addr:"533 Southeast Central Pkwy, Stuart", type:"Customer", lat:27.1890, lng:-80.2452 },
+  { name:"Coastal Land Development", addr:"5640 Southeast Grouper Ave, Stuart", type:"Customer", lat:27.1780, lng:-80.2181 },
+  { name:"Morganti - Stuart", addr:"1115 Southeast Ocean Blvd, Stuart", type:"Customer", lat:27.1840, lng:-80.2342 },
+  { name:"Spears Construction Group, Inc", addr:"7688 Southwest Jack James Drive, Stuart", type:"Customer", lat:27.1490, lng:-80.2640 },
+  { name:"Hooks Construction", addr:"2211 South Kanner Hwy, Stuart", type:"Other", lat:27.1700, lng:-80.2410 },
+  { name:"Lawrence Lee Construction Services Inc", addr:"800 Southeast Lincoln Ave, Stuart", type:"Other", lat:27.1870, lng:-80.2360 },
+  { name:"Martin County - Engineering Department", addr:"2401 SE Monterey Road, Stuart", type:"Other", lat:27.1892, lng:-80.2430 },
+  { name:"Martin County Board of Co-Commissioners", addr:"2401 SE Monterey Road, Stuart", type:"Other", lat:27.1893, lng:-80.2431 },
+  { name:"Bowman - Stuart", addr:"301 Southeast Ocean Blvd, Stuart", type:"Other", lat:27.1930, lng:-80.2411 },
+  { name:"RCP Shelters, Inc.", addr:"2100 Southeast Ray's Way, Stuart", type:"Other", lat:27.1820, lng:-80.2250 },
+  { name:"Captec Engineering", addr:"301 Northwest Flagler Ave, Stuart", type:"Other", lat:27.2020, lng:-80.2510 },
+  { name:"Florida Hydroseeding & Erosion Control", addr:"3458 SE Dixie Hwy, Stuart", type:"Other", lat:27.1760, lng:-80.2201 },
+  { name:"GRSC, Inc.", addr:"1643 Northwest Dove Court, Stuart", type:"Other", lat:27.2060, lng:-80.2550 },
+  { name:"Lucido & Associates", addr:"East Ocean Drive, Stuart", type:"Other", lat:27.1950, lng:-80.2380 },
+  { name:"Betsy Lindsay Inc", addr:"7997 Southwest Jack James Drive, Stuart", type:"Other", lat:27.1488, lng:-80.2641 },
+  { name:"Felix Civil Construction", addr:"8528 SW Kansas Ave, Stuart", type:"Customer", lat:27.1520, lng:-80.2660 },
+  { name:"Felix Associates of Florida", addr:"8528 SW Kansas Ave, Stuart", type:"Customer", lat:27.1521, lng:-80.2659 },
+  { name:"Sunshine Land Design Inc.", addr:"3291 SE Lionel Terrace, Stuart", type:"Other", lat:27.1770, lng:-80.2200 },
+
+  // Palm City / Jensen Beach
+  { name:"Centerline Utilities, Inc.", addr:"2180 SW Poma Drive, Palm City", type:"Other", lat:27.1630, lng:-80.2720 },
+  { name:"Rion Marine", addr:"6830 SW Markel Street, Palm City", type:"Other", lat:27.1570, lng:-80.2750 },
+  { name:"Palmera Construction", addr:"1084 NE Industrial Blvd, Jensen Beach", type:"Other", lat:27.2550, lng:-80.2340 },
+  { name:"Aegen Construction", addr:"3930 NE Indian River Drive, Jensen Beach", type:"Other", lat:27.2430, lng:-80.2100 },
+
+  // Port St. Lucie
+  { name:"Morganti Group - Port St. Lucie", addr:"264 NW Peacock Blvd, Port St. Lucie", type:"Other", lat:27.3040, lng:-80.3540 },
+  { name:"Proctor Construction Co. - Corporate", addr:"10521 SW Village Center Drive, Port St. Lucie", type:"Other", lat:27.2520, lng:-80.4210 },
+  { name:"Architects Design Collaborative", addr:"10489 SW Meeting Street, Port St. Lucie", type:"Other", lat:27.2518, lng:-80.4212 },
+  { name:"Andersen Andre Consulting Engineers, Inc.", addr:"834 SW Swan Ave, Port St. Lucie", type:"Other", lat:27.2810, lng:-80.3620 },
+  { name:"Wynne Building Corporation", addr:"8000 South U.S. Highway 1, Port St. Lucie", type:"Other", lat:27.2210, lng:-80.2840 },
+
+  // Fort Pierce
+  { name:"DICKERSON FLORIDA, INC.", addr:"3122 North 25th Street, Fort Pierce", type:"Other", lat:27.4420, lng:-80.3550 },
+  { name:"Dickerson Infrastructure, Inc.", addr:"3122 North 25th Street, Fort Pierce", type:"Other", lat:27.4421, lng:-80.3551 },
+  { name:"Paul Jacquin & Sons Inc", addr:"7348 Commercial Circle, Fort Pierce", type:"Other", lat:27.4020, lng:-80.3950 },
+  { name:"A. Thomas Construction Inc.", addr:"1380 Bayshore Drive, Fort Pierce", type:"Other", lat:27.4470, lng:-80.3270 },
+  { name:"City of Fort Pierce", addr:"100 North US Highway 1, Fort Pierce", type:"Other", lat:27.4467, lng:-80.3256 },
+  { name:"Culpepper & Terpening", addr:"2980 South 25th Street, Fort Pierce", type:"Other", lat:27.4110, lng:-80.3560 },
+  { name:"Office of the Medical Examiner District 19", addr:"2500 South 35th Street, Fort Pierce", type:"Other", lat:27.4120, lng:-80.3680 },
+  { name:"Gale Construction", addr:"7259 South Indian River Drive, Fort Pierce", type:"Other", lat:27.3730, lng:-80.3120 },
+  { name:"Custom Built Marine Construction Inc", addr:"3119 Hammond Road, Fort Pierce", type:"Other", lat:27.4200, lng:-80.3540 },
+  { name:"Remnant Construction, LLC", addr:"201 S 2nd St, Fort Pierce", type:"Other", lat:27.4450, lng:-80.3250 },
+
+  // Vero Beach
+  { name:"Kimley-Horn - Vero Beach", addr:"445 24th Street, Vero Beach", type:"Other", lat:27.6410, lng:-80.3970 },
+  { name:"Timothy Rose Contracting", addr:"1880 82nd Avenue, Vero Beach", type:"Customer", lat:27.6520, lng:-80.5210 },
+  { name:"Higher Ground Land Services, Llc", addr:"6350 13th Street SW, Vero Beach", type:"Other", lat:27.6110, lng:-80.4620 },
+
+  // Lantana / Delray / Greenacres area
+  { name:"Johnson-Davis Inc", addr:"604 Hillbrath Dr, Lantana", type:"Other", lat:26.5630, lng:-80.0540 },
+  { name:"All County Paving", addr:"1180 SW 10th St., Delray Beach", type:"Other", lat:26.4520, lng:-80.0830 },
+  { name:"DP Development LLC", addr:"1014 South Congress Ave, Palm Springs", type:"Other", lat:26.6330, lng:-80.0930 },
+
+  // Out-of-primary-area (South Florida / Miami area - include but note)
+  { name:"MBR Construction", addr:"1020 NW 51st Street, Fort Lauderdale", type:"Other", lat:26.1380, lng:-80.1530 },
+  { name:"Shiff Construction & Development", addr:"180 SW 6th Street, Pompano Beach", type:"Other", lat:26.2290, lng:-80.1360 },
+  { name:"CIMA Engineering Corp", addr:"6800 W Commercial Blvd, Fort Lauderdale", type:"Other", lat:26.1820, lng:-80.2530 },
+  { name:"BERGERON LAND DEVELOPMENT, INC.", addr:"19612 SW 69th Place, Ft Lauderdale", type:"Other", lat:26.0210, lng:-80.3820 },
+  { name:"Southern Underground Industries", addr:"794 South Military Trail, Deerfield Beach", type:"Other", lat:26.3060, lng:-80.1490 },
+  { name:"Ric-Man International Inc", addr:"1545 NW 27th Ave, Pompano Beach", type:"Other", lat:26.2360, lng:-80.1830 },
+  { name:"American Construction & Engineering", addr:"1027 NW 31st Ave, Pompano Beach", type:"Other", lat:26.2340, lng:-80.1850 },
+  { name:"Marlin Engineering Inc", addr:"3363 W. Commercial Blvd, Fort Lauderdale", type:"Other", lat:26.1822, lng:-80.2531 },
+  { name:"Prestige Construction Engineering Group LLC", addr:"2244 N 72nd Ter, Pembroke Pines", type:"Other", lat:26.0070, lng:-80.2050 },
+  { name:"JCI Development Corp", addr:"10155 NW 23rd Ct., Coral Springs", type:"Other", lat:26.2710, lng:-80.2730 },
+  { name:"Prestige Development & Construction", addr:"1108 Kane Concourse, Bay Harbor Islands", type:"Other", lat:25.8880, lng:-80.1330 },
+  { name:"DoubleDay Engineering", addr:"95 Merrick Way, Coral Gables", type:"Other", lat:25.7460, lng:-80.2720 },
+  { name:"Target Engineering Group, Inc.", addr:"359 Alcazar Ave, Coral Gables", type:"Other", lat:25.7462, lng:-80.2723 },
+  { name:"SRS Engineering, Inc.", addr:"5001 SW 74th Court, Miami", type:"Other", lat:25.7030, lng:-80.3250 },
+  { name:"BCC Engineering - Miami", addr:"6401 SW 87th Ave, Miami", type:"Other", lat:25.6870, lng:-80.3480 },
+  { name:"Bacallao Construction & Engineering", addr:"5410 SW 95th Court, Miami", type:"Other", lat:25.6810, lng:-80.3580 },
+  { name:"Acre Engineering & Construction Inc.", addr:"2451 NW 109th Ave, Miami", type:"Other", lat:25.7840, lng:-80.3740 },
+  { name:"Caltran Engineering Group, Inc.", addr:"730 NW 107th Ave, Miami", type:"Other", lat:25.7760, lng:-80.3720 },
+  { name:"R & G Engineering", addr:"10830 NW 23rd St, Miami", type:"Other", lat:25.7841, lng:-80.3741 },
+  { name:"Rtech Engineering", addr:"301 NW 127th Ave, Miami", type:"Other", lat:25.7790, lng:-80.4000 },
+  { name:"HBC Engineering Company", addr:"13155 SW 134th St, Miami", type:"Other", lat:25.6640, lng:-80.4130 },
+  { name:"ATC Engineering Inc", addr:"2222 NW 14th Street, Miami", type:"Customer", lat:25.7870, lng:-80.2290 },
+  { name:"Arrow Asphalt & Engineering Inc", addr:"3051 NW 129th Street, Opa-locka", type:"Other", lat:25.9030, lng:-80.3160 },
+  { name:"THE STOUT GROUP, LLC", addr:"10850 NW 138th St, Hialeah Gardens", type:"Other", lat:25.8980, lng:-80.3700 },
+  { name:"Roadway Construction LLC", addr:"12391 SW 130 Street, Miami", type:"Customer", lat:25.6640, lng:-80.4420 },
+  { name:"Ferreira Construction - Medley", addr:"6101 NW 74th Ave, Miami", type:"Customer", lat:25.8270, lng:-80.3540 },
+  { name:"Hartec Group Inc", addr:"9700 SW 104th St, Miami", type:"Other", lat:25.6760, lng:-80.3680 },
+  { name:"Alexander & Johnson Project Mgmt", addr:"901 SW 62nd Ave, Hollywood", type:"Other", lat:26.0110, lng:-80.2180 },
+  { name:"Horizon Contractors", addr:"8175 W 32nd Ave, Hialeah", type:"Prospect", lat:25.8680, lng:-80.3370 },
+  { name:"Daniel O'Connell's Sons", addr:"8100 Oak Ln, Miami Lakes", type:"Other", lat:25.9160, lng:-80.3230 },
+];
+
+// ─── ZONES ─────────────────────────────────────────────────────────────
+// Define 5×5 mile visit zones (approx 0.072° lat × 0.083° lng per 5 miles in FL)
+const zones = [
+  { id:"Z1", name:"West Palm Beach — Downtown/Central", lat:26.715, lng:-80.055, color:"#00d4aa" },
+  { id:"Z2", name:"West Palm Beach — Vista Pkwy Corridor", lat:26.693, lng:-80.120, color:"#00bfff" },
+  { id:"Z3", name:"WPB North / Palm Beach Gardens", lat:26.830, lng:-80.127, color:"#7c3aed" },
+  { id:"Z4", name:"Wellington / Royal Palm Beach", lat:26.672, lng:-80.222, color:"#e879f9" },
+  { id:"Z5", name:"Stuart / Palm City", lat:27.178, lng:-80.255, color:"#ff6b35" },
+  { id:"Z6", name:"Port St. Lucie", lat:27.277, lng:-80.390, color:"#fbbf24" },
+  { id:"Z7", name:"Fort Pierce", lat:27.427, lng:-80.360, color:"#34d399" },
+  { id:"Z8", name:"Vero Beach", lat:27.638, lng:-80.418, color:"#60a5fa" },
+  { id:"Z9", name:"South FL / Miami-Dade", lat:25.810, lng:-80.320, color:"#f472b6" },
+  { id:"Z10", name:"Broward County", lat:26.190, lng:-80.210, color:"#a78bfa" },
+];
+
+// Assign zone to each company
+function assignZone(lat, lng) {
+  let best = null, bestDist = Infinity;
+  zones.forEach(z => {
+    const d = Math.sqrt((lat-z.lat)**2 + (lng-z.lng)**2);
+    if (d < bestDist) { bestDist = d; best = z; }
+  });
+  return best;
+}
+
+companies.forEach(c => { c.zone = assignZone(c.lat, c.lng); });
+
+// ─── MAP INIT ───────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: [27.00, -80.25],
+  zoom: 9,
+  zoomControl: true,
+  preferCanvas: true,
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '©OpenStreetMap contributors, ©CARTO',
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map);
+
+// Draw zone rectangles
+const halfLat = 0.036, halfLng = 0.042; // ~2.5 miles each direction
+zones.forEach(z => {
+  L.rectangle([
+    [z.lat - halfLat, z.lng - halfLng],
+    [z.lat + halfLat, z.lng + halfLng]
+  ], {
+    color: z.color,
+    weight: 1.5,
+    opacity: 0.5,
+    fillOpacity: 0.04,
+    dashArray: '4 4',
+  }).addTo(map).bindTooltip(`<b style="color:${z.color}">${z.id}: ${z.name}</b>`, {sticky:true});
+});
+
+// Create marker icon
+function makeIcon(type, zoneBg) {
+  const colors = { Customer:'#00d4aa', Prospect:'#ff6b35', Other:'#7c3aed' };
+  const c = colors[type] || colors.Other;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="24" viewBox="0 0 20 24">
+    <ellipse cx="10" cy="22" rx="4" ry="2" fill="rgba(0,0,0,0.3)"/>
+    <path d="M10 0 C5 0 1 4 1 9 C1 15 10 22 10 22 C10 22 19 15 19 9 C19 4 15 0 10 0Z" fill="${c}" stroke="rgba(0,0,0,0.4)" stroke-width="1"/>
+    <circle cx="10" cy="9" r="4" fill="rgba(0,0,0,0.25)"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [20, 24],
+    iconAnchor: [10, 24],
+    popupAnchor: [0, -24],
+  });
+}
+
+// Build markers
+const clusterGroup = L.markerClusterGroup({
+  maxClusterRadius: 40,
+  spiderfyOnMaxZoom: true,
+  showCoverageOnHover: false,
+});
+
+const allMarkers = [];
+
+companies.forEach(c => {
+  const typeKey = c.type === 'Customer' ? 'Customer' : c.type === 'Prospect' ? 'Prospect' : 'Other';
+  const icon = makeIcon(typeKey);
+  const marker = L.marker([c.lat, c.lng], { icon });
+  marker.companyData = c;
+  marker.companyType = typeKey;
+
+  const typeClass = `type-${typeKey}`;
+  marker.bindPopup(`
+    <div class="popup-name">${c.name}</div>
+    <div class="popup-addr">${c.addr}</div>
+    <span class="popup-type ${typeClass}">${c.type || 'Contact'}</span>
+    <div class="zone-badge">📍 ${c.zone.id}: ${c.zone.name}</div>
+  `, { maxWidth: 260 });
+
+  clusterGroup.addLayer(marker);
+  allMarkers.push(marker);
+});
+
+map.addLayer(clusterGroup);
+
+// ─── STATS ─────────────────────────────────────────────────────────────
+document.getElementById('stat-shown').textContent = companies.length;
+document.getElementById('stat-clusters').textContent = zones.length;
+
+// ─── FILTER ────────────────────────────────────────────────────────────
+let activeFilter = 'all';
+let searchTerm = '';
+
+function updateMarkers() {
+  clusterGroup.clearLayers();
+  let count = 0;
+  allMarkers.forEach(m => {
+    const c = m.companyData;
+    const matchFilter = activeFilter === 'all' || m.companyType === activeFilter;
+    const matchSearch = !searchTerm || c.name.toLowerCase().includes(searchTerm.toLowerCase());
+    if (matchFilter && matchSearch) {
+      clusterGroup.addLayer(m);
+      count++;
+    }
+  });
+  document.getElementById('stat-shown').textContent = count;
+}
+
+function filterMarkers(f) {
+  activeFilter = f;
+  ['all','Customer','Prospect','Other'].forEach(t => {
+    const key = t === 'all' ? 'btn-all' : t === 'Customer' ? 'btn-customer' : t === 'Prospect' ? 'btn-prospect' : 'btn-notype';
+    const btn = document.getElementById(key);
+    if (btn) btn.className = 'filter-btn' + (f === t ? ` active-${t.toLowerCase() === 'other' ? 'notype' : t.toLowerCase()}` : '');
+  });
+  updateMarkers();
+}
+
+function searchMarkers(val) {
+  searchTerm = val;
+  updateMarkers();
+}
+
+// Build zone summary in sidebar
+</script>
+
+</body>
+</html>
